@@ -265,9 +265,7 @@ def draw_pose_landmarks(landmarks: list, dest: rl.Rectangle):
         rl.draw_circle_v(normal_to_dest(position, dest), LANDMARK_RADIUS, LANDMARK_COLOR)
 
 
-frame_counter = 0
 def draw_avatar(target: rl.RenderTexture, model: rl.Model, anim: rl.ModelAnimation, shader: rl.Shader, dest: rl.Rectangle):
-    global frame_counter
     # Hardcoded values specifically for the avatar model
     iota = -1
     HIPS = (iota := iota + 1)
@@ -292,7 +290,7 @@ def draw_avatar(target: rl.RenderTexture, model: rl.Model, anim: rl.ModelAnimati
     RIGHT_TOE_BASE = (iota := iota + 1)
 
     camera = rl.Camera3D(
-        position=rl.Vector3(0, 5, 15),
+        position=rl.Vector3(0, 0, 15),
         target=rl.Vector3(0, 0, 0),
         up=rl.Vector3(0, 1, 0),
         fovy=45,
@@ -302,21 +300,25 @@ def draw_avatar(target: rl.RenderTexture, model: rl.Model, anim: rl.ModelAnimati
     cameraPos = struct.pack("fff", camera.position.x, camera.position.y, camera.position.z)
     rl.set_shader_value(shader, shader.locs[rl.SHADER_LOC_VECTOR_VIEW], cameraPos, rl.SHADER_UNIFORM_VEC3)
 
+    anim.frame_poses[0] = model.bind_pose
+
     mouse = rl.get_mouse_position()
+    # print(anim.frame_poses[0][0].rotation.w)
+    # anim.frame_poses[0][0].rotation.w = (mouse.x/WIDTH) * 100
+    # print(anim.frame_poses[0][0].rotation.w)
+
+    anim.frame_poses[0][HIPS].translation.x = (mouse.x - WIDTH/2) * 0.1
     
-    # anim.frame_poses[0][0].translation.x = (mouse.x - WIDTH/2) * 0.1
-    
-    rl.update_model_animation(model, anim, 5)
-    frame_counter = (frame_counter + 1) % anim.frame_count
-    
+    rl.update_model_animation(model, anim, 0)
+
     rl.begin_texture_mode(target)
     rl.clear_background(rl.RAYWHITE)
     
     rl.begin_mode3d(camera)
-    rl.draw_model_ex(model, rl.Vector3(0, 0, 0), rl.Vector3(1, 0, 0), 0, rl.Vector3(1, 1, 1), rl.WHITE)
+    rl.draw_model(model, rl.Vector3(0, 0, 0), 1, rl.WHITE)
 
     for i in range(anim.bone_count):
-        rl.draw_sphere(anim.frame_poses[0][i].translation, 0.2, rl.RED)
+        rl.draw_sphere(anim.frame_poses[0][i].translation, 1, rl.RED)
     rl.end_mode3d()
     
     rl.end_texture_mode()
@@ -361,9 +363,7 @@ def main():
     for i in range(model.material_count):
         model.materials[i].shader = lighting_shader
     
-    # anim = rl.ModelAnimation(model.bone_count, 1, model.bones, ctypes.cast(ctypes.pointer(model.bind_pose), rl.TransformPtrPtr), b"Anim")
-    anim_count = 1
-    anim = rl.load_model_animations(avatar_model_path, anim_count)[0]
+    anim = rl.ModelAnimation(model.bone_count, 1, model.bones, ctypes.cast(ctypes.pointer(model.bind_pose), rl.TransformPtrPtr), b"Anim")
     for i in range(anim.frame_count):
         print(f'Frame {i}:')
         print(anim.frame_poses[i])
@@ -378,7 +378,6 @@ def main():
         print(f'     Translation: {model.bind_pose[i].translation}')
         print(f'     Rotation:    {model.bind_pose[i].rotation}')
         print(f'     Scale:       {model.bind_pose[i].scale}')
-    # exit()
     
     blur_cam = True
 
