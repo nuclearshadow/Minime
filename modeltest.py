@@ -1,9 +1,10 @@
 import raylibpy as rl
+import raymath as rm
 
 def main():
-    width = 800
-    height = 600
-    rl.init_window(width, height, "Model animation test")
+    WIDTH = 800
+    HEIGHT = 600
+    rl.init_window(WIDTH, HEIGHT, "Model animation test")
     rl.set_target_fps(60)
 
     camera = rl.Camera(
@@ -24,19 +25,6 @@ def main():
         print("%s" % anim.name)
 
     anim = anims[0]
-    print(f"{anim}")
-
-    # var pose: [19]rl.Transform = undefined;
-    # @memcpy(&pose, model.bindPose);
-    # var anim = rl.ModelAnimation{
-    #     .boneCount = model.boneCount,
-    #     .bones = model.bones,
-    #     .frameCount = 1,
-    #     .framePoses = &pose,
-    #     .name = undefined,
-    # };
-    # @memset(&anim.name, 0);
-    # @memcpy(anim.name[0..4], "Anim");
 
     frameCounter = 0
 
@@ -46,8 +34,11 @@ def main():
 
         mouse = rl.get_mouse_position()
 
-        anim.frame_poses[0][0].translation.x = (mouse.x - width / 2) * 0.01
-
+        rot = anim.frame_poses[0][5].rotation
+        rot.x = (mouse.y - WIDTH / 2) * 0.001
+        rot.y = (mouse.x - WIDTH / 2) * 0.001
+        anim.frame_poses[0][5].rotation = rm.vector4_normalize(rot)
+        
         rl.update_model_animation(model, anim, 0)
         # rl.update_model_animation(model, anim, frameCounter)
         frameCounter = (frameCounter + 1) % anim.frame_count

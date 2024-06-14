@@ -27,19 +27,6 @@ pub fn main() !void {
     }
 
     const anim = anims[0];
-    std.debug.print("{any}", .{anim});
-
-    // var pose: [19]rl.Transform = undefined;
-    // @memcpy(&pose, model.bindPose);
-    // var anim = rl.ModelAnimation{
-    //     .boneCount = model.boneCount,
-    //     .bones = model.bones,
-    //     .frameCount = 1,
-    //     .framePoses = &pose,
-    //     .name = undefined,
-    // };
-    // @memset(&anim.name, 0);
-    // @memcpy(anim.name[0..4], "Anim");
 
     var frameCounter: c_int = 0;
 
@@ -49,7 +36,10 @@ pub fn main() !void {
 
         const mouse = rl.getMousePosition();
 
-        anim.framePoses[0][0].translation.x = (mouse.x - width / 2) * 0.01;
+        var rot = anim.framePoses[0][5].rotation;
+        rot.x = (mouse.y - width / 2) * 0.001;
+        rot.y = (mouse.x - width / 2) * 0.001;
+        anim.framePoses[0][5].rotation = rot.normalize();
 
         rl.updateModelAnimation(model, anim, 0);
         // rl.updateModelAnimation(model, anim, frameCounter);
