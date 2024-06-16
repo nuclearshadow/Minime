@@ -1,7 +1,7 @@
-import math
 import ctypes
 import struct
-import copy
+import subprocess as sp
+import json
 
 import mediapipe as mp
 from mediapipe.tasks import python
@@ -10,8 +10,6 @@ from mediapipe.tasks.python import vision
 import cv2
 
 import raylibpy as rl
-
-from rlights import *
 
 # face_model_path = 'resources/ai_models/face_landmarker.task'
 pose_model_path = 'resources/ai_models/pose_landmarker_lite.task'
@@ -28,8 +26,8 @@ PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
 PoseLandmarkerResult = mp.tasks.vision.PoseLandmarkerResult
 VisionRunningMode = mp.tasks.vision.RunningMode
 
-WIDTH = 1240
-HEIGHT = 720
+WIDTH = 800
+HEIGHT = 600
 
 
 result = None
@@ -265,69 +263,6 @@ def draw_pose_landmarks(landmarks: list, dest: rl.Rectangle):
         rl.draw_circle_v(normal_to_dest(position, dest), LANDMARK_RADIUS, LANDMARK_COLOR)
 
 
-def draw_avatar(target: rl.RenderTexture, model: rl.Model, anim: rl.ModelAnimation, shader: rl.Shader, dest: rl.Rectangle):
-    # Hardcoded values specifically for the avatar model
-    iota = -1
-    HIPS = (iota := iota + 1)
-    SPINE = (iota := iota + 1)
-    SPINE1 = (iota := iota + 1)
-    SPINE2 = (iota := iota + 1)
-    NECK = (iota := iota + 1)
-    HEAD = (iota := iota + 1)
-    LEFT_ARM = (iota := iota + 1)
-    LEFT_FORE_ARM = (iota := iota + 1)
-    LEFT_HAND = (iota := iota + 1)
-    RIGHT_ARM = (iota := iota + 1)
-    RIGHT_FORE_ARM = (iota := iota + 1)
-    RIGHT_HAND = (iota := iota + 1)
-    LEFT_UP_LEG = (iota := iota + 1)
-    LEFT_LEG = (iota := iota + 1)
-    LEFT_FOOT = (iota := iota + 1)
-    LEFT_TOE_BASE = (iota := iota + 1)
-    RIGHT_UP_LEG = (iota := iota + 1)
-    RIGHT_LEG = (iota := iota + 1)
-    RIGHT_FOOT = (iota := iota + 1)
-    RIGHT_TOE_BASE = (iota := iota + 1)
-
-    camera = rl.Camera3D(
-        position=rl.Vector3(0, 0, 15),
-        target=rl.Vector3(0, 0, 0),
-        up=rl.Vector3(0, 1, 0),
-        fovy=45,
-        projection=rl.CAMERA_PERSPECTIVE
-    )
-    
-    cameraPos = struct.pack("fff", camera.position.x, camera.position.y, camera.position.z)
-    rl.set_shader_value(shader, shader.locs[rl.SHADER_LOC_VECTOR_VIEW], cameraPos, rl.SHADER_UNIFORM_VEC3)
-
-    anim.frame_poses[0] = model.bind_pose
-
-    mouse = rl.get_mouse_position()
-    # print(anim.frame_poses[0][0].rotation.w)
-    # anim.frame_poses[0][0].rotation.w = (mouse.x/WIDTH) * 100
-    # print(anim.frame_poses[0][0].rotation.w)
-
-    anim.frame_poses[0][HIPS].translation.x = (mouse.x - WIDTH/2) * 0.1
-    
-    rl.update_model_animation(model, anim, 0)
-
-    rl.begin_texture_mode(target)
-    rl.clear_background(rl.RAYWHITE)
-    
-    rl.begin_mode3d(camera)
-    rl.draw_model(model, rl.Vector3(0, 0, 0), 1, rl.WHITE)
-
-    for i in range(anim.bone_count):
-        rl.draw_sphere(anim.frame_poses[0][i].translation, 1, rl.RED)
-    rl.end_mode3d()
-    
-    rl.end_texture_mode()
-
-    rl.draw_texture_pro(target.texture, 
-        rl.Rectangle(0, 0, target.texture.width, -target.texture.height),
-        dest, rl.Vector2(0, 0), 0, rl.WHITE
-    )
-
 def main():
     cap = cv2.VideoCapture(0)
 
@@ -338,7 +273,11 @@ def main():
 
     landmarker = PoseLandmarker.create_from_options(options)
 
-    rl.init_window(WIDTH, HEIGHT, "Minime")
+    build = sp.run(["zig", "build"], cwd="ModelRenderer")
+    if build.returncode != 0: return
+    proc = sp.Popen("ModelRenderer/zig-out/bin/ModelRenderer", cwd="ModelRenderer", stdin=sp.PIPE)
+
+    rl.init_window(WIDTH, HEIGHT, "Minime: Tracker")
     rl.set_target_fps(60)
 
     blur_shader = rl.load_shader(None, 'resources/shaders/blur.fs')
@@ -349,40 +288,7 @@ def main():
     rl.set_shader_value(blur_shader, render_width_loc, struct.pack("i", WIDTH) , rl.SHADER_UNIFORM_INT)
     rl.set_shader_value(blur_shader, render_height_loc, struct.pack("i", HEIGHT) , rl.SHADER_UNIFORM_INT)
 
-    lighting_shader = rl.load_shader('resources/shaders/lighting.vs', 'resources/shaders/lighting.fs')
-
-    lighting_shader.locs[rl.SHADER_LOC_VECTOR_VIEW] = rl.get_shader_location(lighting_shader, "viewPos")
-    
-    ambientLoc = rl.get_shader_location(lighting_shader, "ambient")
-    rl.set_shader_value(lighting_shader, ambientLoc,  struct.pack("ffff", 0.1, 0.1, 0.1, 1.0), rl.SHADER_UNIFORM_VEC4)
-
-    light = create_light(LIGHT_DIRECTIONAL, rl.Vector3(0, 5, 10), rl.Vector3(0, 0, 0), rl.WHITE, lighting_shader)
-
-    avatar_model_path = 'resources/3d_models/avatar_rigged.glb'
-    model = rl.load_model(avatar_model_path)
-    for i in range(model.material_count):
-        model.materials[i].shader = lighting_shader
-    
-    anim = rl.ModelAnimation(model.bone_count, 1, model.bones, ctypes.cast(ctypes.pointer(model.bind_pose), rl.TransformPtrPtr), b"Anim")
-    for i in range(anim.frame_count):
-        print(f'Frame {i}:')
-        print(anim.frame_poses[i])
-        for j in range(anim.bone_count):
-            print(f'    Bone {j}')
-            print(f'     Translation: {anim.frame_poses[i][j].translation}')
-            print(f'     Rotation:    {anim.frame_poses[i][j].rotation}')
-            print(f'     Scale:       {anim.frame_poses[i][j].scale}')
-
-    for i in range(model.bone_count):
-        print(f'    Bone {i}')
-        print(f'     Translation: {model.bind_pose[i].translation}')
-        print(f'     Rotation:    {model.bind_pose[i].rotation}')
-        print(f'     Scale:       {model.bind_pose[i].scale}')
-    
     blur_cam = True
-
-    FACTOR = 200
-    render_texture = rl.load_render_texture(3 * FACTOR, 2 * FACTOR)
 
     while not rl.window_should_close():
         ret, frame = cap.read()
@@ -391,6 +297,8 @@ def main():
 
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         landmarker.detect_async(mp_image, int(rl.get_time() * 1000))
+
+        if proc.poll() != None or not proc.stdin.writable(): break
         
         if rl.is_key_pressed(rl.KEY_B): blur_cam = not blur_cam
 
@@ -398,9 +306,8 @@ def main():
 
         rl.clear_background(rl.Color(18, 18, 18, 255))
 
-        w = WIDTH/2
-        cap_h = (frame_height/frame_width) * w
-        dest = rl.Rectangle(0, HEIGHT/2 - cap_h/2, w, cap_h)
+        
+        dest = rl.Rectangle(0, 0, WIDTH, HEIGHT)
 
         if blur_cam: rl.begin_shader_mode(blur_shader)
         rl.set_trace_log_level(rl.LOG_WARNING)
@@ -409,18 +316,17 @@ def main():
         if blur_cam: rl.end_shader_mode()
 
         if result and len(result.pose_landmarks) > 0:
+            landmarks_json = json.dumps(result.pose_landmarks[0], default=lambda o:o.__dict__)
+            proc.stdin.write(bytes(landmarks_json, 'UTF-8'))
+            try: proc.stdin.flush() 
+            except: break
             draw_pose_landmarks(result.pose_landmarks[0], dest)
-
-        aspect = render_texture.texture.height / render_texture.texture.width
-        mv_h = w * aspect
-
-        # update_light_values(lighting_shader, light) # not necessary since we don't need to update the light
-        draw_avatar(render_texture, model, anim, lighting_shader, rl.Rectangle(WIDTH/2, HEIGHT/2 - mv_h/2, w, mv_h))
 
         rl.end_drawing()
 
-    rl.unload_render_texture(render_texture)
     rl.close_window()
+
+    proc.kill()
 
     landmarker.close()
 

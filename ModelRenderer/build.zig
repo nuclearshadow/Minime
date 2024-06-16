@@ -24,8 +24,17 @@ pub fn build(b: *std.Build) void {
     const raygui = raylib_dep.module("raygui"); // raygui module
     const raylib_artifact = raylib_dep.artifact("raylib"); // raylib C library
 
+    const rlights = b.addStaticLibrary(.{
+        .name = "rlights",
+        .root_source_file = b.path("src/rlights.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    b.installArtifact(rlights);
+
     const exe = b.addExecutable(.{
-        .name = "zig_model_test",
+        .name = "ModelRenderer",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
