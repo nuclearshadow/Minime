@@ -279,6 +279,10 @@ def main():
 
     rl.init_window(WIDTH, HEIGHT, "Minime: Tracker")
     rl.set_target_fps(60)
+    monitor = rl.get_current_monitor()
+    monitor_width = rl.get_monitor_width(monitor)
+    monitor_height = rl.get_monitor_height(monitor)
+    rl.set_window_position(monitor_width/2 - WIDTH, monitor_height/2 - HEIGHT/2)
 
     blur_shader = rl.load_shader(None, 'resources/shaders/blur.fs')
 
@@ -288,6 +292,7 @@ def main():
     rl.set_shader_value(blur_shader, render_width_loc, struct.pack("i", WIDTH) , rl.SHADER_UNIFORM_INT)
     rl.set_shader_value(blur_shader, render_height_loc, struct.pack("i", HEIGHT) , rl.SHADER_UNIFORM_INT)
 
+    show_cam = False
     blur_cam = True
 
     while not rl.window_should_close():
@@ -300,6 +305,7 @@ def main():
 
         if proc.poll() != None or not proc.stdin.writable(): break
         
+        if rl.is_key_pressed(rl.KEY_C): show_cam = not show_cam
         if rl.is_key_pressed(rl.KEY_B): blur_cam = not blur_cam
 
         rl.begin_drawing()
@@ -309,14 +315,15 @@ def main():
         
         dest = rl.Rectangle(0, 0, WIDTH, HEIGHT)
 
-        if blur_cam: rl.begin_shader_mode(blur_shader)
-        rl.set_trace_log_level(rl.LOG_WARNING)
-        draw_numpy_image(frame_rgb, dest)
-        rl.set_trace_log_level(rl.LOG_ALL)
-        if blur_cam: rl.end_shader_mode()
+        if show_cam:
+            if blur_cam: rl.begin_shader_mode(blur_shader)
+            rl.set_trace_log_level(rl.LOG_WARNING)
+            draw_numpy_image(frame_rgb, dest)
+            rl.set_trace_log_level(rl.LOG_ALL)
+            if blur_cam: rl.end_shader_mode()
 
         if result and len(result.pose_landmarks) > 0:
-            landmarks_json = json.dumps(result.pose_landmarks[0], default=lambda o:o.__dict__)
+            landmarks_json = json.dumps(result.pose_world_landmarks[0], default=lambda o:o.__dict__)
             proc.stdin.write(bytes(landmarks_json, 'UTF-8'))
             try: proc.stdin.flush() 
             except: break
