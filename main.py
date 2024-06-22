@@ -297,11 +297,12 @@ def main():
 
     while not rl.window_should_close():
         ret, frame = cap.read()
-        frame_height, frame_width, _ = frame.shape
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if ret:
+            frame_height, frame_width, _ = frame.shape
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
-        landmarker.detect_async(mp_image, int(rl.get_time() * 1000))
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+            landmarker.detect_async(mp_image, int(rl.get_time() * 1000))
 
         if proc.poll() != None or not proc.stdin.writable(): break
         
@@ -315,7 +316,7 @@ def main():
         
         dest = rl.Rectangle(0, 0, WIDTH, HEIGHT)
 
-        if show_cam:
+        if show_cam and ret:
             if blur_cam: rl.begin_shader_mode(blur_shader)
             rl.set_trace_log_level(rl.LOG_WARNING)
             draw_numpy_image(frame_rgb, dest)

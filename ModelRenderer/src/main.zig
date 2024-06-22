@@ -166,60 +166,130 @@ pub fn main() !void {
         rl.beginDrawing();
         rl.clearBackground(rl.Color.ray_white);
 
+        camera.begin();
+
+        const pose = anim.framePoses[0][0..@intCast(anim.boneCount)];
+        const bindPose = model.bindPose[0..@intCast(anim.boneCount)];
+        const bones = anim.bones[0..@intCast(anim.boneCount)];
+        rotateBonesFromLandmarks(pose, landmarks);
+        snapBonesToParent(pose, bones, bindPose);
         rl.updateModelAnimation(model, anim, 0);
 
-        camera.begin();
-        transformBonesFromLandmarks(anim.framePoses[0][0..@intCast(anim.boneCount)], landmarks);
-
-        model.drawEx(rl.Vector3.zero(), rl.Vector3{ .x = 1, .y = 0, .z = 0 }, 0, rl.Vector3{ .x = 1, .y = 1, .z = 1 }, rl.Color.white);
+        model.drawEx(rl.Vector3.zero(), .{ .x = 1, .y = 0, .z = 0 }, 0, .{ .x = 1, .y = 1, .z = 1 }, rl.Color.white);
         for (anim.framePoses[0], 0..@intCast(anim.boneCount)) |transform, _| {
             rl.drawSphere(transform.translation, 0.1, rl.Color.red);
-            // var tAxis: rl.Vector3 = undefined;
-            // var tAngle: f32 = undefined;
-            // transform.rotation.toAxisAngle(&tAxis, &tAngle);
-            // rl.drawLine3D(transform.translation, transform.translation.add(tAxis.scale(5.0)), rl.Color.blue);
         }
 
         camera.end();
-        // for (landmarks) |landmark| {
-        //     const center = rl.Vector2{
-        //         .x = landmark.x * @as(f32, @floatFromInt(width)),
-        //         .y = landmark.y * @as(f32, @floatFromInt(height)),
-        //     };
-        //     rl.drawCircleV(center, 10, rl.Color.red);
-        // }
 
         rl.endDrawing();
     }
 }
 
-fn transformBonesFromLandmarks(bones: []rl.Transform, landmarks: []const Landmark) void {
-    const mouthLeft = landmarkToVector3(getLandmark(landmarks, .mouth_left));
-    const mouthRight = landmarkToVector3(getLandmark(landmarks, .mouth_right));
-    const mouthMid = rl.Vector3.lerp(mouthLeft, mouthRight, 0.5);
-    const eyesMid = rl.Vector3.lerp(
-        landmarkToVector3(getLandmark(landmarks, .left_eye_outer)),
-        landmarkToVector3(getLandmark(landmarks, .right_eye_outer)),
-        0.5,
-    );
-    const earsMid = rl.Vector3.lerp(
-        landmarkToVector3(getLandmark(landmarks, .left_ear)),
-        landmarkToVector3(getLandmark(landmarks, .right_ear)),
-        0.5,
-    );
-    const up = eyesMid.lerp(earsMid, 0.3).subtract(mouthMid).normalize();
-    const left = mouthLeft.subtract(mouthRight).normalize();
-    var forward = left.crossProduct(up).normalize();
-    const headPos = getBone(bones, .head).translation;
-    rl.drawLine3D(headPos, headPos.add(up.scale(5.0)), rl.Color.purple);
-    rl.drawLine3D(headPos, headPos.add(left.scale(5.0)), rl.Color.green);
-    rl.drawLine3D(headPos, headPos.add(forward.scale(5.0)), rl.Color.red);
+// The direction of bones at 0 rotation is up (+y)
+// Quaternion.fromEuler rotation order is ZYX i.e. roll yaw pitch (relative to self)
+fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) void {
+    // _ = landmarks;
+    // for (pose) |*bone| {
+    //     bone.rotation = rl.Quaternion.fromEuler(0, 0, 90 * math.rad_per_deg);
+    // }
 
+    { // head
+        const mouthLeft = landmarkToVector3(getLandmark(landmarks, .mouth_left));
+        const mouthRight = landmarkToVector3(getLandmark(landmarks, .mouth_right));
+        const mouthMid = rl.Vector3.lerp(mouthLeft, mouthRight, 0.5);
+        const eyesMid = rl.Vector3.lerp(
+            landmarkToVector3(getLandmark(landmarks, .left_eye_outer)),
+            landmarkToVector3(getLandmark(landmarks, .right_eye_outer)),
+            0.5,
+        );
+        const earsMid = rl.Vector3.lerp(
+            landmarkToVector3(getLandmark(landmarks, .left_ear)),
+            landmarkToVector3(getLandmark(landmarks, .right_ear)),
+            0.5,
+        );
+        const up = eyesMid.lerp(earsMid, 0.3).subtract(mouthMid).normalize();
+        const left = mouthLeft.subtract(mouthRight).normalize();
+        var forward = left.crossProduct(up).normalize();
+        const headPos = getBone(pose, .head).translation;
+        rl.drawLine3D(headPos, headPos.add(up.scale(5.0)), rl.Color.purple);
+        rl.drawLine3D(headPos, headPos.add(left.scale(5.0)), rl.Color.green);
+        rl.drawLine3D(headPos, headPos.add(forward.scale(5.0)), rl.Color.red);
+        var rot = rotationFromUpForawrd(up, forward).toEuler();
+        rot.x *= 2; // exaggerate pitch since it appears to be too little
+        getBone(pose, .head).rotation = rl.Quaternion.fromEuler(rot.x, rot.y, rot.z);
+    }
+    { // right arm
+        const shoulder = landmarkToVector3(getLandmark(landmarks, .right_shoulder));
+        const elbow = landmarkToVector3(getLandmark(landmarks, .right_elbow));
+        const up = elbow.subtract(shoulder).normalize();
+        var upYZProj = up;
+        upYZProj.x = 0;
+        const left = upYZProj.rotateByAxisAngle(xAxis, -90 * math.rad_per_deg);
+        var forward = left.crossProduct(up).normalize();
+        const armPos = getBone(pose, .right_arm).translation;
+        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
+        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
+        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        getBone(pose, .right_arm).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // right fore-arm and hand
+        const elbow = landmarkToVector3(getLandmark(landmarks, .right_elbow));
+        const wrist = landmarkToVector3(getLandmark(landmarks, .right_wrist));
+        const up = wrist.subtract(elbow).normalize();
+        var upYZProj = up;
+        upYZProj.x = 0;
+        const left = upYZProj.rotateByAxisAngle(xAxis, -90 * math.rad_per_deg);
+        var forward = left.crossProduct(up).normalize();
+        const armPos = getBone(pose, .right_fore_arm).translation;
+        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
+        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
+        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        const rotation = rotationFromUpForawrd(up, forward);
+        getBone(pose, .right_fore_arm).rotation = rotation;
+        getBone(pose, .right_hand).rotation = rotation;
+    }
+}
+
+fn snapBonesToParent(pose: []rl.Transform, bones: []const rl.BoneInfo, bindPose: []rl.Transform) void {
+    std.debug.assert(pose.len == bones.len and pose.len == bindPose.len);
+    for (pose, bones, bindPose) |*bone, info, originalBone| {
+        if (info.parent < 0) continue;
+        const parent = pose[@intCast(info.parent)];
+        const originalParent = bindPose[@intCast(info.parent)];
+        const offset = originalBone.translation.subtract(originalParent.translation);
+        var rotOpposite = originalParent.rotation;
+        rotOpposite.x *= -1;
+        rotOpposite.y *= -1;
+        rotOpposite.z *= -1;
+        const offsetRotated = offset.rotateByQuaternion(rotOpposite).rotateByQuaternion(parent.rotation);
+        bone.translation = parent.translation.add(offsetRotated);
+        rl.drawLine3D(parent.translation, bone.translation, rl.Color.magenta);
+    }
+}
+
+// my own really weird implementation
+fn rotationFromForawrdLeft(forward: rl.Vector3, left: rl.Vector3) rl.Quaternion {
     var leftXYProj = left;
     leftXYProj.z = 0;
     const roll: f32 = math.sign(leftXYProj.y) * leftXYProj.angle(xAxis);
     const yaw: f32 = -math.sign(left.z) * left.angle(leftXYProj);
     const tempForawrd = zAxis.rotateByQuaternion(rl.Quaternion.fromEuler(0, yaw, roll));
     const pitch: f32 = -math.sign(forward.rotateByQuaternion(rl.Quaternion.fromEuler(0, 0, roll)).y) * forward.angle(tempForawrd);
-    getBone(bones, .head).rotation = rl.Quaternion.fromEuler(pitch * 2, yaw, roll);
+    return rl.Quaternion.fromEuler(pitch, yaw, roll);
+}
+
+// ChatGPT suggested matrix bs
+fn rotationFromUpForawrd(up_: rl.Vector3, forward_: rl.Vector3) rl.Quaternion {
+    var up = up_.normalize();
+    const forward = forward_.normalize();
+    const right = up.crossProduct(forward);
+    up = forward.crossProduct(right);
+    const rotationMatrix: rl.Matrix = .{
+        .m0 = right.x, .m4 = up.x, .m8  = forward.x, .m12 = 0.0,
+        .m1 = right.y, .m5 = up.y, .m9  = forward.y, .m13 = 0.0,
+        .m2 = right.z, .m6 = up.z, .m10 = forward.z, .m14 = 0.0,
+        .m3 = 0.0,     .m7 = 0.0,  .m11 = 0.0,       .m15 = 1.0,
+    };
+    return rl.Quaternion.fromMatrix(rotationMatrix);
 }
