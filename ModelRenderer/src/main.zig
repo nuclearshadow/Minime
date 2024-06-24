@@ -223,10 +223,10 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         const shoulder = landmarkToVector3(getLandmark(landmarks, .right_shoulder));
         const elbow = landmarkToVector3(getLandmark(landmarks, .right_elbow));
         const up = elbow.subtract(shoulder).normalize();
-        var upYZProj = up;
-        upYZProj.x = 0;
-        const left = upYZProj.rotateByAxisAngle(xAxis, -90 * math.rad_per_deg);
-        var forward = left.crossProduct(up).normalize();
+        var upXYProj = up;
+        upXYProj.z = 0;
+        const forward = upXYProj.rotateByAxisAngle(zAxis, 90 * math.rad_per_deg).normalize();
+        const left = up.crossProduct(forward).normalize();
         const armPos = getBone(pose, .right_arm).translation;
         rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
         rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
@@ -237,10 +237,10 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         const elbow = landmarkToVector3(getLandmark(landmarks, .right_elbow));
         const wrist = landmarkToVector3(getLandmark(landmarks, .right_wrist));
         const up = wrist.subtract(elbow).normalize();
-        var upYZProj = up;
-        upYZProj.x = 0;
-        const left = upYZProj.rotateByAxisAngle(xAxis, -90 * math.rad_per_deg);
-        var forward = left.crossProduct(up).normalize();
+        var upXYProj = up;
+        upXYProj.z = 0;
+        const forward = upXYProj.rotateByAxisAngle(zAxis, 90 * math.rad_per_deg).normalize();
+        const left = up.crossProduct(forward).normalize();
         const armPos = getBone(pose, .right_fore_arm).translation;
         rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
         rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
@@ -248,6 +248,36 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         const rotation = rotationFromUpForawrd(up, forward);
         getBone(pose, .right_fore_arm).rotation = rotation;
         getBone(pose, .right_hand).rotation = rotation;
+    }
+    { // left arm
+        const shoulder = landmarkToVector3(getLandmark(landmarks, .left_shoulder));
+        const elbow = landmarkToVector3(getLandmark(landmarks, .left_elbow));
+        const up = elbow.subtract(shoulder).normalize();
+        var upXYProj = up;
+        upXYProj.z = 0;
+        const forward = upXYProj.rotateByAxisAngle(zAxis, -90 * math.rad_per_deg).normalize();
+        const left = up.crossProduct(forward).normalize();
+        const armPos = getBone(pose, .left_arm).translation;
+        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
+        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
+        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        getBone(pose, .left_arm).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // left fore-arm and hand
+        const elbow = landmarkToVector3(getLandmark(landmarks, .left_elbow));
+        const wrist = landmarkToVector3(getLandmark(landmarks, .left_wrist));
+        const up = wrist.subtract(elbow).normalize();
+        var upXYProj = up;
+        upXYProj.z = 0;
+        const forward = upXYProj.rotateByAxisAngle(zAxis, -90 * math.rad_per_deg).normalize();
+        const left = up.crossProduct(forward).normalize();
+        const armPos = getBone(pose, .left_fore_arm).translation;
+        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
+        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
+        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        const rotation = rotationFromUpForawrd(up, forward);
+        getBone(pose, .left_fore_arm).rotation = rotation;
+        getBone(pose, .left_hand).rotation = rotation;
     }
 }
 
