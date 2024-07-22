@@ -255,10 +255,11 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     const shouldersMid = leftShoulder.lerp(rightShoulder, 0.5);
     const hipsMid = leftHip.lerp(rightHip, 0.5);
     const localUp = shouldersMid.subtract(hipsMid).normalize();
-    const localLeft = leftShoulder.subtract(rightShoulder).normalize();
-    const localForawrd = localUp.crossProduct(localLeft).normalize();
+    var localLeft = leftShoulder.subtract(rightShoulder).normalize();
+    const localForawrd = localLeft.crossProduct(localUp).normalize();
+    // localLeft = localUp.crossProduct(localForawrd).normalize();
 
-    { // head
+    { // head and neck
         const mouthMid = rl.Vector3.lerp(mouthLeft, mouthRight, 0.5);
         const eyesMid = rl.Vector3.lerp(
             landmarkToVector3(getLandmark(landmarks, .left_eye_outer)),
@@ -277,18 +278,19 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         var rot = rotationFromUpForawrd(up, forward).toEuler();
         rot.x *= 2; // exaggerate pitch since it appears to be too little
         getBone(pose, .head).rotation = rl.Quaternion.fromEuler(rot.x, rot.y, rot.z);
+        getBone(pose, .neck).rotation = rotationFromUpForawrd(localUp, localForawrd);
     }
     { // right arm
         const up = rightElbow.subtract(rightShoulder).normalize();
         const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
+        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
         
         getBone(pose, .right_arm).rotation = rotationFromUpForawrd(up, forward);
     }
     { // right fore-arm and hand
         const up = rightWrist.subtract(rightElbow).normalize();
         const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
+        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
 
         const rotation = rotationFromUpForawrd(up, forward);
         getBone(pose, .right_fore_arm).rotation = rotation;
@@ -297,18 +299,29 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     { // left arm
         const up = leftElbow.subtract(leftShoulder).normalize();
         const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
+        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
 
         getBone(pose, .left_arm).rotation = rotationFromUpForawrd(up, forward);
     }
     { // left fore-arm and hand
         const up = leftWrist.subtract(leftElbow).normalize();
         const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
+        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
 
         const rotation = rotationFromUpForawrd(up, forward);
         getBone(pose, .left_fore_arm).rotation = rotation;
         getBone(pose, .left_hand).rotation = rotation;
+    }
+    { // hips and spine
+        const hipsLeft = rightHip.subtract(leftHip);
+        const shouldersLeft = rightShoulder.subtract(leftShoulder);
+        const hipsUp = hipsLeft.crossProduct(localForawrd).normalize();
+        const shouldersUp = shouldersLeft.crossProduct(localForawrd);
+
+        getBone(pose, .hips  ).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 0.0 ), localForawrd);
+        getBone(pose, .spine ).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 0.33), localForawrd);
+        getBone(pose, .spine1).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 0.66), localForawrd);
+        getBone(pose, .spine2).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 1.0 ), localForawrd);
     }
 }
 
