@@ -194,9 +194,71 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     //     bone.rotation = rl.Quaternion.fromEuler(0, 0, 90 * math.rad_per_deg);
     // }
 
+    const nose           = landmarkToVector3(getLandmark(landmarks, .nose));
+    const leftEyeInner   = landmarkToVector3(getLandmark(landmarks, .left_eye_inner));
+    const leftEye        = landmarkToVector3(getLandmark(landmarks, .left_eye));
+    const leftEyeOuter   = landmarkToVector3(getLandmark(landmarks, .left_eye_outer));
+    const rightEyeInner  = landmarkToVector3(getLandmark(landmarks, .right_eye_inner));
+    const rightEye       = landmarkToVector3(getLandmark(landmarks, .right_eye));
+    const rightEyeOuter  = landmarkToVector3(getLandmark(landmarks, .right_eye_outer));
+    const leftEar        = landmarkToVector3(getLandmark(landmarks, .left_ear));
+    const rightEar       = landmarkToVector3(getLandmark(landmarks, .right_ear));
+    const mouthLeft      = landmarkToVector3(getLandmark(landmarks, .mouth_left));
+    const mouthRight     = landmarkToVector3(getLandmark(landmarks, .mouth_right));
+    const leftShoulder   = landmarkToVector3(getLandmark(landmarks, .left_shoulder));
+    const rightShoulder  = landmarkToVector3(getLandmark(landmarks, .right_shoulder));
+    const leftElbow      = landmarkToVector3(getLandmark(landmarks, .left_elbow));
+    const rightElbow     = landmarkToVector3(getLandmark(landmarks, .right_elbow));
+    const leftWrist      = landmarkToVector3(getLandmark(landmarks, .left_wrist));
+    const rightWrist     = landmarkToVector3(getLandmark(landmarks, .right_wrist));
+    const leftPinky      = landmarkToVector3(getLandmark(landmarks, .left_pinky));
+    const rightPinky     = landmarkToVector3(getLandmark(landmarks, .right_pinky));
+    const leftIndex      = landmarkToVector3(getLandmark(landmarks, .left_index));
+    const rightIndex     = landmarkToVector3(getLandmark(landmarks, .right_index));
+    const leftThumb      = landmarkToVector3(getLandmark(landmarks, .left_thumb));
+    const rightThumb     = landmarkToVector3(getLandmark(landmarks, .right_thumb));
+    const leftHip        = landmarkToVector3(getLandmark(landmarks, .left_hip));
+    const rightHip       = landmarkToVector3(getLandmark(landmarks, .right_hip));
+    const leftKnee       = landmarkToVector3(getLandmark(landmarks, .left_knee));
+    const rightKnee      = landmarkToVector3(getLandmark(landmarks, .right_knee));
+    const leftAnkle      = landmarkToVector3(getLandmark(landmarks, .left_ankle));
+    const rightAnkle     = landmarkToVector3(getLandmark(landmarks, .right_ankle));
+    const leftHeel       = landmarkToVector3(getLandmark(landmarks, .left_heel));
+    const rightHeel      = landmarkToVector3(getLandmark(landmarks, .right_heel));
+    const leftFootIndex  = landmarkToVector3(getLandmark(landmarks, .left_foot_index));
+    const rightFootIndex = landmarkToVector3(getLandmark(landmarks, .right_foot_index));
+    
+    _ = nose;
+    _ = leftEyeInner;
+    _ = leftEye;
+    _ = leftEyeOuter;
+    _ = rightEyeInner;
+    _ = rightEye;
+    _ = rightEyeOuter;
+    _ = leftEar;
+    _ = rightEar;
+    _ = leftPinky;
+    _ = rightPinky;
+    _ = leftIndex;
+    _ = rightIndex;
+    _ = leftThumb;
+    _ = rightThumb;
+    _ = leftKnee;
+    _ = rightKnee;
+    _ = leftAnkle;
+    _ = rightAnkle;
+    _ = leftHeel;
+    _ = rightHeel;
+    _ = leftFootIndex;
+    _ = rightFootIndex;
+
+    const shouldersMid = leftShoulder.lerp(rightShoulder, 0.5);
+    const hipsMid = leftHip.lerp(rightHip, 0.5);
+    const localUp = shouldersMid.subtract(hipsMid).normalize();
+    const localLeft = leftShoulder.subtract(rightShoulder).normalize();
+    const localForawrd = localUp.crossProduct(localLeft).normalize();
+
     { // head
-        const mouthLeft = landmarkToVector3(getLandmark(landmarks, .mouth_left));
-        const mouthRight = landmarkToVector3(getLandmark(landmarks, .mouth_right));
         const mouthMid = rl.Vector3.lerp(mouthLeft, mouthRight, 0.5);
         const eyesMid = rl.Vector3.lerp(
             landmarkToVector3(getLandmark(landmarks, .left_eye_outer)),
@@ -210,71 +272,40 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         );
         const up = eyesMid.lerp(earsMid, 0.3).subtract(mouthMid).normalize();
         const left = mouthLeft.subtract(mouthRight).normalize();
-        var forward = left.crossProduct(up).normalize();
-        const headPos = getBone(pose, .head).translation;
-        rl.drawLine3D(headPos, headPos.add(up.scale(5.0)), rl.Color.purple);
-        rl.drawLine3D(headPos, headPos.add(left.scale(5.0)), rl.Color.green);
-        rl.drawLine3D(headPos, headPos.add(forward.scale(5.0)), rl.Color.red);
+        const forward = left.crossProduct(up).normalize();
+
         var rot = rotationFromUpForawrd(up, forward).toEuler();
         rot.x *= 2; // exaggerate pitch since it appears to be too little
         getBone(pose, .head).rotation = rl.Quaternion.fromEuler(rot.x, rot.y, rot.z);
     }
     { // right arm
-        const shoulder = landmarkToVector3(getLandmark(landmarks, .right_shoulder));
-        const elbow = landmarkToVector3(getLandmark(landmarks, .right_elbow));
-        const up = elbow.subtract(shoulder).normalize();
-        var upXYProj = up;
-        upXYProj.z = 0;
-        const forward = upXYProj.rotateByAxisAngle(zAxis, 90 * math.rad_per_deg).normalize();
-        const left = up.crossProduct(forward).normalize();
-        const armPos = getBone(pose, .right_arm).translation;
-        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
-        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
-        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        const up = rightElbow.subtract(rightShoulder).normalize();
+        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
+        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
+        
         getBone(pose, .right_arm).rotation = rotationFromUpForawrd(up, forward);
     }
     { // right fore-arm and hand
-        const elbow = landmarkToVector3(getLandmark(landmarks, .right_elbow));
-        const wrist = landmarkToVector3(getLandmark(landmarks, .right_wrist));
-        const up = wrist.subtract(elbow).normalize();
-        var upXYProj = up;
-        upXYProj.z = 0;
-        const forward = upXYProj.rotateByAxisAngle(zAxis, 90 * math.rad_per_deg).normalize();
-        const left = up.crossProduct(forward).normalize();
-        const armPos = getBone(pose, .right_fore_arm).translation;
-        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
-        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
-        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        const up = rightWrist.subtract(rightElbow).normalize();
+        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
+        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
+
         const rotation = rotationFromUpForawrd(up, forward);
         getBone(pose, .right_fore_arm).rotation = rotation;
         getBone(pose, .right_hand).rotation = rotation;
     }
     { // left arm
-        const shoulder = landmarkToVector3(getLandmark(landmarks, .left_shoulder));
-        const elbow = landmarkToVector3(getLandmark(landmarks, .left_elbow));
-        const up = elbow.subtract(shoulder).normalize();
-        var upXYProj = up;
-        upXYProj.z = 0;
-        const forward = upXYProj.rotateByAxisAngle(zAxis, -90 * math.rad_per_deg).normalize();
-        const left = up.crossProduct(forward).normalize();
-        const armPos = getBone(pose, .left_arm).translation;
-        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
-        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
-        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        const up = leftElbow.subtract(leftShoulder).normalize();
+        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
+        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
+
         getBone(pose, .left_arm).rotation = rotationFromUpForawrd(up, forward);
     }
     { // left fore-arm and hand
-        const elbow = landmarkToVector3(getLandmark(landmarks, .left_elbow));
-        const wrist = landmarkToVector3(getLandmark(landmarks, .left_wrist));
-        const up = wrist.subtract(elbow).normalize();
-        var upXYProj = up;
-        upXYProj.z = 0;
-        const forward = upXYProj.rotateByAxisAngle(zAxis, -90 * math.rad_per_deg).normalize();
-        const left = up.crossProduct(forward).normalize();
-        const armPos = getBone(pose, .left_fore_arm).translation;
-        rl.drawLine3D(armPos, armPos.add(up.scale(5.0)), rl.Color.purple);
-        rl.drawLine3D(armPos, armPos.add(left.scale(5.0)), rl.Color.green);
-        rl.drawLine3D(armPos, armPos.add(forward.scale(5.0)), rl.Color.red);
+        const up = leftWrist.subtract(leftElbow).normalize();
+        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
+        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
+
         const rotation = rotationFromUpForawrd(up, forward);
         getBone(pose, .left_fore_arm).rotation = rotation;
         getBone(pose, .left_hand).rotation = rotation;
@@ -298,18 +329,6 @@ fn snapBonesToParent(pose: []rl.Transform, bones: []const rl.BoneInfo, bindPose:
     }
 }
 
-// my own really weird implementation
-fn rotationFromForawrdLeft(forward: rl.Vector3, left: rl.Vector3) rl.Quaternion {
-    var leftXYProj = left;
-    leftXYProj.z = 0;
-    const roll: f32 = math.sign(leftXYProj.y) * leftXYProj.angle(xAxis);
-    const yaw: f32 = -math.sign(left.z) * left.angle(leftXYProj);
-    const tempForawrd = zAxis.rotateByQuaternion(rl.Quaternion.fromEuler(0, yaw, roll));
-    const pitch: f32 = -math.sign(forward.rotateByQuaternion(rl.Quaternion.fromEuler(0, 0, roll)).y) * forward.angle(tempForawrd);
-    return rl.Quaternion.fromEuler(pitch, yaw, roll);
-}
-
-// ChatGPT suggested matrix bs
 fn rotationFromUpForawrd(up_: rl.Vector3, forward_: rl.Vector3) rl.Quaternion {
     var up = up_.normalize();
     const forward = forward_.normalize();
