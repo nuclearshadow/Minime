@@ -122,6 +122,9 @@ pub fn main() !void {
         .projection = .camera_perspective,
     };
 
+    const factor = 0.3;
+    const renderTarget = rl.loadRenderTexture(width * factor, height * factor);
+
     const shader = rl.loadShader("resources/shaders/lighting.vs", "resources/shaders/lighting.fs");
     defer rl.unloadShader(shader);
 
@@ -129,7 +132,7 @@ pub fn main() !void {
     shader.locs[shader_loc_vector_view] = rl.getShaderLocation(shader, "viewPos");
 
     const ambientLoc: i32 = rl.getShaderLocation(shader, "ambient");
-    rl.setShaderValue(shader, ambientLoc, &[_]f32{ 0.1, 0.1, 0.1, 1.0 }, .shader_uniform_vec4);
+    rl.setShaderValue(shader, ambientLoc, &[_]f32{ 0.1, 0.1, 0.5, 1.0 }, .shader_uniform_vec4);
 
     const light = rlights.Light.create(.light_directional, rl.Vector3{ .x = 0, .y = 5, .z = 15 }, rl.Vector3.zero(), rl.Color.white, shader);
 
@@ -175,6 +178,7 @@ pub fn main() !void {
         rl.updateCameraPro(&camera, camMove, rl.Vector3.zero(), 0);
 
         rl.beginDrawing();
+        rl.beginTextureMode(renderTarget);
         rl.clearBackground(rl.Color.ray_white);
 
         camera.begin();
@@ -192,7 +196,20 @@ pub fn main() !void {
         }
 
         camera.end();
-
+        rl.endTextureMode();
+        const sourceRect = rl.Rectangle{
+            .x = 0,
+            .y = 0,
+            .width = width * factor,
+            .height = -height * factor,
+        };
+        const destRect = rl.Rectangle{
+            .x = 0,
+            .y = 0,
+            .width = width,
+            .height = height,
+        };
+        rl.drawTexturePro(renderTarget.texture, sourceRect, destRect, .{ .x = 0, .y = 0 }, 0, rl.Color.white);
         rl.endDrawing();
     }
 }
@@ -266,10 +283,21 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     const shouldersMid = leftShoulder.lerp(rightShoulder, 0.5);
     const hipsMid = leftHip.lerp(rightHip, 0.5);
     const localUp = shouldersMid.subtract(hipsMid).normalize();
-    var localLeft = leftShoulder.subtract(rightShoulder).normalize();
-    const localForawrd = localLeft.crossProduct(localUp).normalize();
-    // localLeft = localUp.crossProduct(localForawrd).normalize();
+    
+    const shouldersLeft = leftShoulder.subtract(rightShoulder).normalize();
+    const shoulderForward = shouldersLeft.crossProduct(localUp).normalize();
+    const shouldersUp = shoulderForward.crossProduct(shouldersLeft).normalize();
+    
+    const hipsLeft = leftHip.subtract(rightHip).normalize();
+    const hipsForward = hipsLeft.crossProduct(localUp).normalize();
+    const hipsUp = hipsForward.crossProduct(hipsLeft).normalize();
 
+    const hipsPos = getBone(pose, .hips).translation;
+    rl.drawLine3D(hipsPos, hipsPos.add(hipsLeft).scale(5), rl.Color.red);
+    rl.drawLine3D(hipsPos, hipsPos.add(hipsForward).scale(5), rl.Color.blue);
+    rl.drawLine3D(hipsPos, hipsPos.add(hipsUp).scale(5), rl.Color.green);
+
+    
     { // head and neck
         const mouthMid = rl.Vector3.lerp(mouthLeft, mouthRight, 0.5);
         const eyesMid = rl.Vector3.lerp(
@@ -289,19 +317,19 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         var rot = rotationFromUpForawrd(up, forward).toEuler();
         rot.x *= 2; // exaggerate pitch since it appears to be too little
         getBone(pose, .head).rotation = rl.Quaternion.fromEuler(rot.x, rot.y, rot.z);
-        getBone(pose, .neck).rotation = rotationFromUpForawrd(localUp, localForawrd);
+        getBone(pose, .neck).rotation = rotationFromUpForawrd(localUp, shoulderForward);
     }
     { // right arm
         const up = rightElbow.subtract(rightShoulder).normalize();
-        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
+        const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
+        const forward = upProj.rotateByAxisAngle(shoulderForward, 90.0 * math.rad_per_deg);
         
         getBone(pose, .right_arm).rotation = rotationFromUpForawrd(up, forward);
     }
     { // right fore-arm and hand
         const up = rightWrist.subtract(rightElbow).normalize();
-        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, 90.0 * math.rad_per_deg);
+        const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
+        const forward = upProj.rotateByAxisAngle(shoulderForward, 90.0 * math.rad_per_deg);
 
         const rotation = rotationFromUpForawrd(up, forward);
         getBone(pose, .right_fore_arm).rotation = rotation;
@@ -309,30 +337,33 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     }
     { // left arm
         const up = leftElbow.subtract(leftShoulder).normalize();
-        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
+        const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
+        const forward = upProj.rotateByAxisAngle(shoulderForward, -90.0 * math.rad_per_deg);
 
         getBone(pose, .left_arm).rotation = rotationFromUpForawrd(up, forward);
     }
     { // left fore-arm and hand
         const up = leftWrist.subtract(leftElbow).normalize();
-        const upProj = localForawrd.crossProduct(up.crossProduct(localForawrd)).normalize();
-        const forward = upProj.rotateByAxisAngle(localForawrd, -90.0 * math.rad_per_deg);
+        const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
+        const forward = upProj.rotateByAxisAngle(shoulderForward, -90.0 * math.rad_per_deg);
 
         const rotation = rotationFromUpForawrd(up, forward);
         getBone(pose, .left_fore_arm).rotation = rotation;
         getBone(pose, .left_hand).rotation = rotation;
     }
     { // hips and spine
-        const hipsLeft = rightHip.subtract(leftHip);
-        const shouldersLeft = rightShoulder.subtract(leftShoulder);
-        const hipsUp = hipsLeft.crossProduct(localForawrd).normalize();
-        const shouldersUp = shouldersLeft.crossProduct(localForawrd);
-
-        getBone(pose, .hips  ).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 0.0 ), localForawrd);
-        getBone(pose, .spine ).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 0.33), localForawrd);
-        getBone(pose, .spine1).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 0.66), localForawrd);
-        getBone(pose, .spine2).rotation = rotationFromUpForawrd(hipsUp.lerp(shouldersUp, 1.0 ), localForawrd);
+        getBone(pose, .hips  ).rotation = rotationFromUpForawrd(
+            hipsUp.lerp(shouldersUp, 0.0 ), 
+            hipsForward.lerp(shoulderForward, 0.0 ));
+        getBone(pose, .spine ).rotation = rotationFromUpForawrd(
+            hipsUp.lerp(shouldersUp, 0.33), 
+            hipsForward.lerp(shoulderForward, 0.33));
+        getBone(pose, .spine1).rotation = rotationFromUpForawrd(
+            hipsUp.lerp(shouldersUp, 0.66), 
+            hipsForward.lerp(shoulderForward, 0.66));
+        getBone(pose, .spine2).rotation = rotationFromUpForawrd(
+            hipsUp.lerp(shouldersUp, 1.0 ), 
+            hipsForward.lerp(shoulderForward, 0.0 ));
     }
 }
 
