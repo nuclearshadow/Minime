@@ -159,9 +159,20 @@ pub fn main() !void {
         const landmarks = parsed.value;
         convertLandmarksCoordinateSpace(landmarks);
 
+        const dt = rl.getFrameTime();
+
         rlights.updateLightValues(shader, light);
         const cameraPos: [3]f32 = .{ camera.position.x, camera.position.y, camera.position.z };
         rl.setShaderValue(shader, shader.locs[shader_loc_vector_view], &cameraPos, .shader_uniform_vec3);
+
+        const camSpeed = 5;
+        var camMove = rl.Vector3.zero();
+        if (rl.isKeyDown(.key_a)) camMove.y -= camSpeed * dt;
+        if (rl.isKeyDown(.key_d)) camMove.y += camSpeed * dt;
+        if (rl.isKeyDown(.key_w)) camMove.z += camSpeed * dt;
+        if (rl.isKeyDown(.key_s)) camMove.z -= camSpeed * dt;
+        camMove.x = rl.getMouseWheelMove() * camSpeed * dt;
+        rl.updateCameraPro(&camera, camMove, rl.Vector3.zero(), 0);
 
         rl.beginDrawing();
         rl.clearBackground(rl.Color.ray_white);
