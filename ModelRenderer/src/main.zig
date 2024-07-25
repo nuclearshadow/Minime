@@ -267,8 +267,6 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     _ = rightEar;
     _ = leftPinky;
     _ = rightPinky;
-    _ = leftIndex;
-    _ = rightIndex;
     _ = leftThumb;
     _ = rightThumb;
     _ = leftHeel;
@@ -320,14 +318,19 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         
         getBone(pose, .right_arm).rotation = rotationFromUpForawrd(up, forward);
     }
-    { // right fore-arm and hand
+    { // right fore-arm
         const up = rightWrist.subtract(rightElbow).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, 90.0 * math.rad_per_deg);
 
-        const rotation = rotationFromUpForawrd(up, forward);
-        getBone(pose, .right_fore_arm).rotation = rotation;
-        getBone(pose, .right_hand).rotation = rotation;
+        getBone(pose, .right_fore_arm).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // right hand
+        const up = rightIndex.subtract(rightWrist).normalize();
+        const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
+        const forward = upProj.rotateByAxisAngle(shoulderForward, 90.0 * math.rad_per_deg);
+
+        getBone(pose, .right_hand).rotation = rotationFromUpForawrd(up, forward);
     }
     { // left arm
         const up = leftElbow.subtract(leftShoulder).normalize();
@@ -336,14 +339,19 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
 
         getBone(pose, .left_arm).rotation = rotationFromUpForawrd(up, forward);
     }
-    { // left fore-arm and hand
+    { // left fore-arm
         const up = leftWrist.subtract(leftElbow).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, -90.0 * math.rad_per_deg);
 
-        const rotation = rotationFromUpForawrd(up, forward);
-        getBone(pose, .left_fore_arm).rotation = rotation;
-        getBone(pose, .left_hand).rotation = rotation;
+        getBone(pose, .left_fore_arm).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // left hand
+        const up = leftIndex.subtract(leftWrist).normalize();
+        const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
+        const forward = upProj.rotateByAxisAngle(shoulderForward, -90.0 * math.rad_per_deg);
+
+        getBone(pose, .left_hand).rotation = rotationFromUpForawrd(up, forward);
     }
     { // hips and spine
         getBone(pose, .hips  ).rotation = rotationFromUpForawrd(
