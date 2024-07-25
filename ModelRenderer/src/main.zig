@@ -217,20 +217,6 @@ pub fn main() !void {
 // The direction of bones at 0 rotation is up (+y)
 // Quaternion.fromEuler rotation order is ZYX i.e. roll yaw pitch (relative to self)
 fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) void {
-    // _ = landmarks;
-    // for (pose) |*bone| {
-    //     bone.rotation = rl.Quaternion.fromEuler(0, 0, 90 * math.rad_per_deg);
-    // }
-
-    const nose           = landmarkToVector3(getLandmark(landmarks, .nose));
-    const leftEyeInner   = landmarkToVector3(getLandmark(landmarks, .left_eye_inner));
-    const leftEye        = landmarkToVector3(getLandmark(landmarks, .left_eye));
-    const leftEyeOuter   = landmarkToVector3(getLandmark(landmarks, .left_eye_outer));
-    const rightEyeInner  = landmarkToVector3(getLandmark(landmarks, .right_eye_inner));
-    const rightEye       = landmarkToVector3(getLandmark(landmarks, .right_eye));
-    const rightEyeOuter  = landmarkToVector3(getLandmark(landmarks, .right_eye_outer));
-    const leftEar        = landmarkToVector3(getLandmark(landmarks, .left_ear));
-    const rightEar       = landmarkToVector3(getLandmark(landmarks, .right_ear));
     const mouthLeft      = landmarkToVector3(getLandmark(landmarks, .mouth_left));
     const mouthRight     = landmarkToVector3(getLandmark(landmarks, .mouth_right));
     const leftShoulder   = landmarkToVector3(getLandmark(landmarks, .left_shoulder));
@@ -239,38 +225,16 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     const rightElbow     = landmarkToVector3(getLandmark(landmarks, .right_elbow));
     const leftWrist      = landmarkToVector3(getLandmark(landmarks, .left_wrist));
     const rightWrist     = landmarkToVector3(getLandmark(landmarks, .right_wrist));
-    const leftPinky      = landmarkToVector3(getLandmark(landmarks, .left_pinky));
-    const rightPinky     = landmarkToVector3(getLandmark(landmarks, .right_pinky));
     const leftIndex      = landmarkToVector3(getLandmark(landmarks, .left_index));
     const rightIndex     = landmarkToVector3(getLandmark(landmarks, .right_index));
-    const leftThumb      = landmarkToVector3(getLandmark(landmarks, .left_thumb));
-    const rightThumb     = landmarkToVector3(getLandmark(landmarks, .right_thumb));
     const leftHip        = landmarkToVector3(getLandmark(landmarks, .left_hip));
     const rightHip       = landmarkToVector3(getLandmark(landmarks, .right_hip));
     const leftKnee       = landmarkToVector3(getLandmark(landmarks, .left_knee));
     const rightKnee      = landmarkToVector3(getLandmark(landmarks, .right_knee));
     const leftAnkle      = landmarkToVector3(getLandmark(landmarks, .left_ankle));
     const rightAnkle     = landmarkToVector3(getLandmark(landmarks, .right_ankle));
-    const leftHeel       = landmarkToVector3(getLandmark(landmarks, .left_heel));
-    const rightHeel      = landmarkToVector3(getLandmark(landmarks, .right_heel));
     const leftFootIndex  = landmarkToVector3(getLandmark(landmarks, .left_foot_index));
     const rightFootIndex = landmarkToVector3(getLandmark(landmarks, .right_foot_index));
-    
-    _ = nose;
-    _ = leftEyeInner;
-    _ = leftEye;
-    _ = leftEyeOuter;
-    _ = rightEyeInner;
-    _ = rightEye;
-    _ = rightEyeOuter;
-    _ = leftEar;
-    _ = rightEar;
-    _ = leftPinky;
-    _ = rightPinky;
-    _ = leftThumb;
-    _ = rightThumb;
-    _ = leftHeel;
-    _ = rightHeel;
     
     const shouldersMid = leftShoulder.lerp(rightShoulder, 0.5);
     const hipsMid = leftHip.lerp(rightHip, 0.5);
@@ -283,12 +247,6 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     const hipsLeft = leftHip.subtract(rightHip).normalize();
     const hipsForward = hipsLeft.crossProduct(localUp).normalize();
     const hipsUp = hipsForward.crossProduct(hipsLeft).normalize();
-
-    const hipsPos = getBone(pose, .hips).translation;
-    rl.drawLine3D(hipsPos, hipsPos.add(hipsLeft).scale(5), rl.Color.red);
-    rl.drawLine3D(hipsPos, hipsPos.add(hipsForward).scale(5), rl.Color.blue);
-    rl.drawLine3D(hipsPos, hipsPos.add(hipsUp).scale(5), rl.Color.green);
-
     
     { // head and neck
         const mouthMid = rl.Vector3.lerp(mouthLeft, mouthRight, 0.5);
