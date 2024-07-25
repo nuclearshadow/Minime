@@ -132,7 +132,7 @@ pub fn main() !void {
     shader.locs[shader_loc_vector_view] = rl.getShaderLocation(shader, "viewPos");
 
     const ambientLoc: i32 = rl.getShaderLocation(shader, "ambient");
-    rl.setShaderValue(shader, ambientLoc, &[_]f32{ 0.1, 0.1, 0.5, 1.0 }, .shader_uniform_vec4);
+    rl.setShaderValue(shader, ambientLoc, &[_]f32{ 0.0, 0.0, 0.5, 1.0 }, .shader_uniform_vec4);
 
     const light = rlights.Light.create(.light_directional, rl.Vector3{ .x = 0, .y = 5, .z = 15 }, rl.Vector3.zero(), rl.Color.white, shader);
 
@@ -271,15 +271,9 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
     _ = rightIndex;
     _ = leftThumb;
     _ = rightThumb;
-    _ = leftKnee;
-    _ = rightKnee;
-    _ = leftAnkle;
-    _ = rightAnkle;
     _ = leftHeel;
     _ = rightHeel;
-    _ = leftFootIndex;
-    _ = rightFootIndex;
-
+    
     const shouldersMid = leftShoulder.lerp(rightShoulder, 0.5);
     const hipsMid = leftHip.lerp(rightHip, 0.5);
     const localUp = shouldersMid.subtract(hipsMid).normalize();
@@ -364,6 +358,48 @@ fn rotateBonesFromLandmarks(pose: []rl.Transform, landmarks: []const Landmark) v
         getBone(pose, .spine2).rotation = rotationFromUpForawrd(
             hipsUp.lerp(shouldersUp, 1.0 ), 
             hipsForward.lerp(shoulderForward, 0.0 ));
+    }
+    { // right up leg
+        const up = rightKnee.subtract(rightHip).normalize();
+        const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
+        const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
+        
+        getBone(pose, .right_up_leg).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // right leg
+        const up = rightAnkle.subtract(rightKnee).normalize();
+        const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
+        const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
+        
+        getBone(pose, .right_leg).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // right foot
+        const up = rightFootIndex.subtract(rightAnkle).normalize();
+        const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
+        const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
+        
+        getBone(pose, .right_foot).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // left up leg
+        const up = leftKnee.subtract(leftHip).normalize();
+        const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
+        const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
+        
+        getBone(pose, .left_up_leg).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // left leg
+        const up = leftAnkle.subtract(leftKnee).normalize();
+        const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
+        const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
+        
+        getBone(pose, .left_leg).rotation = rotationFromUpForawrd(up, forward);
+    }
+    { // left foot
+        const up = leftFootIndex.subtract(leftAnkle).normalize();
+        const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
+        const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
+        
+        getBone(pose, .left_foot).rotation = rotationFromUpForawrd(up, forward);
     }
 }
 

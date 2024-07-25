@@ -33,7 +33,8 @@ HEIGHT = 600
 result = None
 def get_landmarker_result(_result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     global result
-    result = _result
+    if len(_result.pose_landmarks) > 0:
+        result = _result
 
 texture = None
 def draw_numpy_image(image, dest: rl.Rectangle):
