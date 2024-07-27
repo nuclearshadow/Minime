@@ -92,7 +92,7 @@ const BoneIndex = enum(usize) {
     count,
 };
 
-fn getBone(bones: []rl.Transform, index: BoneIndex) *rl.Transform {
+fn getBone(bones: anytype, index: BoneIndex) *(@typeInfo(@TypeOf(bones)).Pointer.child) {
     return &bones[@intFromEnum(index)];
 }
 
@@ -190,6 +190,7 @@ pub fn main() !void {
         const bindPose = model.bindPose[0..@intCast(anim.boneCount)];
         const bones = anim.bones[0..@intCast(anim.boneCount)];
         rotationsFromLandmarks(&calculatedRotations, landmarks);
+        adjustRotationByVisibility(&calculatedRotations, landmarks, bindPose);
         applyRotations(pose, &calculatedRotations, dt);
         snapBonesToParent(pose, bones, bindPose);
         rl.updateModelAnimation(model, anim, 0);
@@ -272,62 +273,62 @@ fn rotationsFromLandmarks(rotations: []rl.Quaternion, landmarks: []const Landmar
 
         var rot = rotationFromUpForawrd(up, forward).toEuler();
         rot.x *= 2; // exaggerate pitch since it appears to be too little
-        rotations[@intFromEnum(BoneIndex.head)] = rl.Quaternion.fromEuler(rot.x, rot.y, rot.z);
-        rotations[@intFromEnum(BoneIndex.neck)] = rotationFromUpForawrd(localUp, shoulderForward);
+        getBone(rotations, .head).* = rl.Quaternion.fromEuler(rot.x, rot.y, rot.z);
+        getBone(rotations, .neck).* = rotationFromUpForawrd(localUp, shoulderForward);
     }
     { // right arm
         const up = rightElbow.subtract(rightShoulder).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, 90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.right_arm)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .right_arm).* = rotationFromUpForawrd(up, forward);
     }
     { // right fore-arm
         const up = rightWrist.subtract(rightElbow).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, 90.0 * math.rad_per_deg);
 
-        rotations[@intFromEnum(BoneIndex.right_fore_arm)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .right_fore_arm).* = rotationFromUpForawrd(up, forward);
     }
     { // right hand
         const up = rightIndex.subtract(rightWrist).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, 90.0 * math.rad_per_deg);
 
-        rotations[@intFromEnum(BoneIndex.right_hand)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .right_hand).* = rotationFromUpForawrd(up, forward);
     }
     { // left arm
         const up = leftElbow.subtract(leftShoulder).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, -90.0 * math.rad_per_deg);
 
-        rotations[@intFromEnum(BoneIndex.left_arm)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .left_arm).* = rotationFromUpForawrd(up, forward);
     }
     { // left fore-arm
         const up = leftWrist.subtract(leftElbow).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, -90.0 * math.rad_per_deg);
 
-        rotations[@intFromEnum(BoneIndex.left_fore_arm)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .left_fore_arm).* = rotationFromUpForawrd(up, forward);
     }
     { // left hand
         const up = leftIndex.subtract(leftWrist).normalize();
         const upProj = shoulderForward.crossProduct(up.crossProduct(shoulderForward)).normalize();
         const forward = upProj.rotateByAxisAngle(shoulderForward, -90.0 * math.rad_per_deg);
 
-        rotations[@intFromEnum(BoneIndex.left_hand)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .left_hand).* = rotationFromUpForawrd(up, forward);
     }
     { // hips and spine
-        rotations[@intFromEnum(BoneIndex.hips)] = rotationFromUpForawrd(
+        getBone(rotations, .hips).* = rotationFromUpForawrd(
             hipsUp.lerp(shouldersUp, 0.0 ), 
             hipsForward.lerp(shoulderForward, 0.0 ));
-        rotations[@intFromEnum(BoneIndex.spine)] = rotationFromUpForawrd(
+        getBone(rotations, .spine).* = rotationFromUpForawrd(
             hipsUp.lerp(shouldersUp, 0.33), 
             hipsForward.lerp(shoulderForward, 0.33));
-        rotations[@intFromEnum(BoneIndex.spine1)] = rotationFromUpForawrd(
+        getBone(rotations, .spine1).* = rotationFromUpForawrd(
             hipsUp.lerp(shouldersUp, 0.66), 
             hipsForward.lerp(shoulderForward, 0.66));
-        rotations[@intFromEnum(BoneIndex.spine2)] = rotationFromUpForawrd(
+        getBone(rotations, .spine2).* = rotationFromUpForawrd(
             hipsUp.lerp(shouldersUp, 1.0 ), 
             hipsForward.lerp(shoulderForward, 0.0 ));
     }
@@ -336,64 +337,76 @@ fn rotationsFromLandmarks(rotations: []rl.Quaternion, landmarks: []const Landmar
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.right_up_leg)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .right_up_leg).* = rotationFromUpForawrd(up, forward);
     }
     { // right leg
         const up = rightAnkle.subtract(rightKnee).normalize();
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.right_leg)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .right_leg).* = rotationFromUpForawrd(up, forward);
     }
     { // right foot
         const up = rightFootIndex.subtract(rightAnkle).normalize();
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.right_foot)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .right_foot).* = rotationFromUpForawrd(up, forward);
     }
     { // right toe base
         const up = rightFootIndex.subtract(rightHeel).normalize();
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.right_toe_base)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .right_toe_base).* = rotationFromUpForawrd(up, forward);
     }
     { // left up leg
         const up = leftKnee.subtract(leftHip).normalize();
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.left_up_leg)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .left_up_leg).* = rotationFromUpForawrd(up, forward);
     }
     { // left leg
         const up = leftAnkle.subtract(leftKnee).normalize();
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.left_leg)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .left_leg).* = rotationFromUpForawrd(up, forward);
     }
     { // left foot
         const up = leftFootIndex.subtract(leftAnkle).normalize();
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.left_foot)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .left_foot).* = rotationFromUpForawrd(up, forward);
     }
     { // left toe base
         const up = leftFootIndex.subtract(leftHeel).normalize();
         const upProj = hipsLeft.crossProduct(up.crossProduct(hipsLeft)).normalize();
         const forward = upProj.rotateByAxisAngle(hipsLeft, -90.0 * math.rad_per_deg);
         
-        rotations[@intFromEnum(BoneIndex.left_toe_base)] = rotationFromUpForawrd(up, forward);
+        getBone(rotations, .left_toe_base).* = rotationFromUpForawrd(up, forward);
     }
+}
+
+fn adjustRotationByVisibility(rotations: []rl.Quaternion, landmarks: []const Landmark, bindPose: []rl.Transform) void {
+    const leftUpLeg  = getBone(rotations, .left_up_leg);
+    const leftLeg    = getBone(rotations, .left_leg);
+    const rightUpLeg = getBone(rotations, .right_up_leg);
+    const rightLeg   = getBone(rotations, .right_leg);
+
+    leftUpLeg.*  = lerpRotation(leftUpLeg.*,  getBone(bindPose, .left_up_leg ).rotation, 1 - getLandmark(landmarks, .left_hip  ).visibility).normalize();
+    leftLeg.*    = lerpRotation(leftLeg.*,    getBone(bindPose, .left_leg    ).rotation, 1 - getLandmark(landmarks, .left_knee ).visibility).normalize();
+    rightUpLeg.* = lerpRotation(rightUpLeg.*, getBone(bindPose, .right_up_leg).rotation, 1 - getLandmark(landmarks, .right_hip ).visibility).normalize();
+    rightLeg.*   = lerpRotation(rightLeg.*,   getBone(bindPose, .right_leg   ).rotation, 1 - getLandmark(landmarks, .right_knee).visibility).normalize();
 }
 
 fn applyRotations(pose: []rl.Transform, rotations: []rl.Quaternion, dt: f32) void {
     std.debug.assert(pose.len == rotations.len);
     const smoothSpeed = 8;
     for (pose, rotations) |*bone, rotation| {
-        bone.rotation = slerp(bone.rotation, rotation, smoothSpeed * dt).normalize(); // need to normalize because slerp is kinda broken where sometimes it results in zero
+        bone.rotation = lerpRotation(bone.rotation, rotation, smoothSpeed * dt).normalize(); // need to normalize because slerp is kinda broken where sometimes it results in zero
     }
 }
 
@@ -445,4 +458,26 @@ fn slerp(a: rl.Quaternion, b_: rl.Quaternion, t: f32) rl.Quaternion {
     const bf: f32 = math.sin(t * theta) / sinTheta;
 
     return a.scale(af).add(b.scale(bf));
+}
+
+// From: https://gist.github.com/shaunlebron/8832585?permalink_comment_id=4341756#gistcomment-4341756
+fn shortAngleDist(from: f32, to: f32) f32 {
+	const turn = math.pi * 2;
+	const deltaAngle = @mod(to - from, turn);
+	return @mod(2*deltaAngle, turn) - deltaAngle;
+}
+
+fn angleLerp(from: f32, to: f32, fraction: f32) f32 {
+	return from + shortAngleDist(from, to)*fraction;
+}
+// end
+
+fn lerpRotation(a: rl.Quaternion, b: rl.Quaternion, t: f32) rl.Quaternion {
+    const aEuler = a.toEuler();
+    const bEuler = b.toEuler();
+    return rl.Quaternion.fromEuler(
+        angleLerp(aEuler.x, bEuler.x, t),
+        angleLerp(aEuler.y, bEuler.y, t),
+        angleLerp(aEuler.z, bEuler.z, t),
+    );
 }
