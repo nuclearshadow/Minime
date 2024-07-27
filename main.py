@@ -330,6 +330,15 @@ def main():
             try: proc.stdin.flush() 
             except: break
             draw_pose_landmarks(result.pose_landmarks[0], dest)
+        
+        TEXT_PAD = 10
+        TEXT_SIZE = 24
+        TEXT_GAP = 5
+        rl.draw_rectangle(0, 0, TEXT_PAD*2 + TEXT_SIZE*10, TEXT_PAD*2 + TEXT_SIZE*2 + TEXT_GAP, rl.color_alpha(rl.BLACK, 0.5))
+        rl.draw_text("[C]", TEXT_PAD, TEXT_PAD, TEXT_SIZE, rl.GREEN if show_cam else rl.RED)
+        rl.draw_text("Show Camera", TEXT_PAD + TEXT_SIZE * 1.5, TEXT_PAD, TEXT_SIZE, rl.WHITE)
+        rl.draw_text("[B]", TEXT_PAD, TEXT_SIZE + TEXT_PAD + TEXT_GAP, TEXT_SIZE, rl.GREEN if blur_cam else rl.RED)
+        rl.draw_text("Blur Camera", TEXT_PAD + TEXT_SIZE * 1.5, TEXT_SIZE + TEXT_PAD + TEXT_GAP, TEXT_SIZE, rl.WHITE)
 
         rl.end_drawing()
 
