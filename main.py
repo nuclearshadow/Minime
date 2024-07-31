@@ -67,42 +67,43 @@ def normal_to_dest(pos: rl.Vector2, dest: rl.Rectangle) -> rl.Vector2:
         y = dest.y + pos.y * dest.height,
     )
 
-def draw_pose_landmarks(landmarks: list, dest: rl.Rectangle):
-    NOSE = 0
-    LEFT_EYE_INNER = 1
-    LEFT_EYE = 2
-    LEFT_EYE_OUTER = 3
-    RIGHT_EYE_INNER = 4
-    RIGHT_EYE = 5
-    RIGHT_EYE_OUTER = 6
-    LEFT_EAR = 7
-    RIGHT_EAR = 8
-    MOUTH_LEFT = 9
-    MOUTH_RIGHT = 10
-    LEFT_SHOULDER = 11
-    RIGHT_SHOULDER = 12
-    LEFT_ELBOW = 13
-    RIGHT_ELBOW = 14
-    LEFT_WRIST = 15
-    RIGHT_WRIST = 16
-    LEFT_PINKY = 17
-    RIGHT_PINKY = 18
-    LEFT_INDEX = 19
-    RIGHT_INDEX = 20
-    LEFT_THUMB = 21
-    RIGHT_THUMB = 22
-    LEFT_HIP = 23
-    RIGHT_HIP = 24
-    LEFT_KNEE = 25
-    RIGHT_KNEE = 26
-    LEFT_ANKLE = 27
-    RIGHT_ANKLE = 28
-    LEFT_HEEL = 29
-    RIGHT_HEEL = 30
-    LEFT_FOOT_INDEX = 31
-    RIGHT_FOOT_INDEX = 32
+NOSE = 0
+LEFT_EYE_INNER = 1
+LEFT_EYE = 2
+LEFT_EYE_OUTER = 3
+RIGHT_EYE_INNER = 4
+RIGHT_EYE = 5
+RIGHT_EYE_OUTER = 6
+LEFT_EAR = 7
+RIGHT_EAR = 8
+MOUTH_LEFT = 9
+MOUTH_RIGHT = 10
+LEFT_SHOULDER = 11
+RIGHT_SHOULDER = 12
+LEFT_ELBOW = 13
+RIGHT_ELBOW = 14
+LEFT_WRIST = 15
+RIGHT_WRIST = 16
+LEFT_PINKY = 17
+RIGHT_PINKY = 18
+LEFT_INDEX = 19
+RIGHT_INDEX = 20
+LEFT_THUMB = 21
+RIGHT_THUMB = 22
+LEFT_HIP = 23
+RIGHT_HIP = 24
+LEFT_KNEE = 25
+RIGHT_KNEE = 26
+LEFT_ANKLE = 27
+RIGHT_ANKLE = 28
+LEFT_HEEL = 29
+RIGHT_HEEL = 30
+LEFT_FOOT_INDEX = 31
+RIGHT_FOOT_INDEX = 32
 
-    LANDMARK_RADIUS = 5
+def draw_pose_landmarks(landmarks: list, dest: rl.Rectangle):
+    LANDMARK_BASE_RADIUS = 5
+    LANDMARK_RADIUS_DEPTH_FACTOR = 5
     LANDMARK_COLOR = rl.RED
 
     LINE_THICK = 2
@@ -261,7 +262,33 @@ def draw_pose_landmarks(landmarks: list, dest: rl.Rectangle):
 
     for landmark in landmarks:
         position = rl.Vector2(landmark.x, landmark.y)
-        rl.draw_circle_v(normal_to_dest(position, dest), LANDMARK_RADIUS, LANDMARK_COLOR)
+        radius = LANDMARK_BASE_RADIUS + LANDMARK_RADIUS_DEPTH_FACTOR * -landmark.z
+        rl.draw_circle_v(normal_to_dest(position, dest), radius, LANDMARK_COLOR)
+
+
+def landmarkToVector3(landmark) -> rl.Vector3:
+    return rl.Vector3(landmark.x, landmark.y, landmark.z)
+
+
+def approximate_position(landmarks: list, width: float, height: float) -> rl.Vector3:
+    leftHip       = landmarkToVector3(landmarks[LEFT_HIP])
+    rightHip      = landmarkToVector3(landmarks[RIGHT_HIP])
+    leftShoulder  = landmarkToVector3(landmarks[LEFT_SHOULDER])
+    rightShoulder = landmarkToVector3(landmarks[RIGHT_SHOULDER])
+    
+    spineVec = leftShoulder.lerp(rightShoulder, 0.5) - leftHip.lerp(rightHip, 0.5)
+    spineVec.y *= height/width
+
+    shoulderVec = leftShoulder - rightShoulder
+    shoulderVec.y *= height/width
+
+    z = (spineVec.xy.length * (1-spineVec.z) + 2*shoulderVec.xy.length * (1-shoulderVec.z)) / (1-spineVec.z + 1-shoulderVec.z)
+
+    position = leftHip.lerp(rightHip, 0.5)
+    position.y *= height/width
+    position.z = -z + 0.5
+    position -= rl.Vector3(0.5, 0.5, 0)        
+    return position
 
 
 def main():
@@ -325,7 +352,13 @@ def main():
             if blur_cam: rl.end_shader_mode()
 
         if result and len(result.pose_landmarks) > 0:
-            landmarks_json = json.dumps(result.pose_world_landmarks[0], default=lambda o:o.__dict__)
+            position = approximate_position(result.pose_landmarks[0], frame_width, frame_height)
+            print(f'{position = }')
+            
+            landmarks_json = json.dumps({
+                "landmarks": result.pose_world_landmarks[0],
+                "position": position.todict()
+            }, default=lambda o:o.__dict__)
             proc.stdin.write(bytes(landmarks_json, 'UTF-8'))
             try: proc.stdin.flush() 
             except: break
