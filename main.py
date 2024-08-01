@@ -353,7 +353,6 @@ def main():
 
         if result and len(result.pose_landmarks) > 0:
             position = approximate_position(result.pose_landmarks[0], frame_width, frame_height)
-            print(f'{position = }')
             
             landmarks_json = json.dumps({
                 "landmarks": result.pose_world_landmarks[0],

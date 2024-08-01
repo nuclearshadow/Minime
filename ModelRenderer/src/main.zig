@@ -124,19 +124,27 @@ pub fn main() !void {
     };
     var camera = defaultCamera;
 
-    const factor = 0.3;
-    const renderTarget = rl.loadRenderTexture(width * factor, height * factor);
+    const targetResFactor = 1;
+    const renderTarget = rl.loadRenderTexture(width * targetResFactor, height * targetResFactor);
 
-    const shader = rl.loadShader("resources/shaders/lighting.vs", "resources/shaders/lighting.fs");
-    defer rl.unloadShader(shader);
+    const downscaleShader = rl.loadShader(null, "resources/shaders/downscale.fs");
+    const dsWidthLoc      = rl.getShaderLocation(downscaleShader, "width");
+    const dsHeightLoc     = rl.getShaderLocation(downscaleShader, "height");
+    const dsResolutionLoc = rl.getShaderLocation(downscaleShader, "resolution");
+
+    rl.setShaderValue(downscaleShader, dsWidthLoc,  &width,  .shader_uniform_int);
+    rl.setShaderValue(downscaleShader, dsHeightLoc, &height, .shader_uniform_int);
+
+    const lightingShader = rl.loadShader("resources/shaders/lighting.vs", "resources/shaders/lighting.fs");
+    defer rl.unloadShader(lightingShader);
 
     const shader_loc_vector_view: usize = @intFromEnum(rl.ShaderLocationIndex.shader_loc_vector_view);
-    shader.locs[shader_loc_vector_view] = rl.getShaderLocation(shader, "viewPos");
+    lightingShader.locs[shader_loc_vector_view] = rl.getShaderLocation(lightingShader, "viewPos");
 
-    const ambientLoc: i32 = rl.getShaderLocation(shader, "ambient");
-    rl.setShaderValue(shader, ambientLoc, &[_]f32{ 0.0, 0.0, 0.5, 1.0 }, .shader_uniform_vec4);
+    const lAmbientLoc: i32 = rl.getShaderLocation(lightingShader, "ambient");
+    rl.setShaderValue(lightingShader, lAmbientLoc, &[_]f32{ 0.0, 0.0, 0.5, 1.0 }, .shader_uniform_vec4);
 
-    const light = rlights.Light.create(.light_directional, rl.Vector3{ .x = 0, .y = 5, .z = 15 }, rl.Vector3.zero(), rl.Color.white, shader);
+    const light = rlights.Light.create(.light_directional, rl.Vector3{ .x = 0, .y = 5, .z = 15 }, rl.Vector3.zero(), rl.Color.white, lightingShader);
 
     const modelPath = "resources/3d_models/avatar_rigged.glb";
 
@@ -144,7 +152,7 @@ pub fn main() !void {
     defer model.unload();
 
     for (model.materials, 0..@intCast(model.materialCount)) |*material, _| {
-        material.shader = shader;
+        material.shader = lightingShader;
     }
 
     const anims = (try rl.loadModelAnimations(modelPath));
@@ -179,15 +187,16 @@ pub fn main() !void {
         position.z += posZOffset;
         // BEWARE: Magic numbers
 
+        // Reverse projection??
         const depth = camera.position.z - position.z;
         position.x *= depth / (camera.position.z + posZOffset);
         position.y *= depth / (camera.position.z + posZOffset);
 
         const dt = rl.getFrameTime();
 
-        rlights.updateLightValues(shader, light);
+        rlights.updateLightValues(lightingShader, light);
         const cameraPos: [3]f32 = .{ camera.position.x, camera.position.y, camera.position.z };
-        rl.setShaderValue(shader, shader.locs[shader_loc_vector_view], &cameraPos, .shader_uniform_vec3);
+        rl.setShaderValue(lightingShader, lightingShader.locs[shader_loc_vector_view], &cameraPos, .shader_uniform_vec3);
 
         const camSpeed = 5;
         var camMove = rl.Vector3.zero();
@@ -202,45 +211,47 @@ pub fn main() !void {
         if (rl.isKeyPressed(.key_r) or positionMode) camera = defaultCamera; // reset the camera
 
         rl.beginDrawing();
-        rl.beginTextureMode(renderTarget);
-        rl.clearBackground(rl.Color.ray_white);
+            rl.beginTextureMode(renderTarget);
+                rl.clearBackground(rl.Color.ray_white);
+                rl.beginMode3D(camera);
+                    const pose = anim.framePoses[0][0..@intCast(anim.boneCount)];
+                    const bindPose = model.bindPose[0..@intCast(anim.boneCount)];
+                    const bones = anim.bones[0..@intCast(anim.boneCount)];
+                    rotationsFromLandmarks(&calculatedRotations, landmarks);
+                    adjustRotationByVisibility(&calculatedRotations, landmarks, bindPose);
+                    applyRotations(pose, &calculatedRotations, dt);
+                    snapBonesToParent(pose, bones, bindPose);
+                    rl.updateModelAnimation(model, anim, 0);
 
-        camera.begin();
-
-        const pose = anim.framePoses[0][0..@intCast(anim.boneCount)];
-        const bindPose = model.bindPose[0..@intCast(anim.boneCount)];
-        const bones = anim.bones[0..@intCast(anim.boneCount)];
-        rotationsFromLandmarks(&calculatedRotations, landmarks);
-        adjustRotationByVisibility(&calculatedRotations, landmarks, bindPose);
-        applyRotations(pose, &calculatedRotations, dt);
-        snapBonesToParent(pose, bones, bindPose);
-        rl.updateModelAnimation(model, anim, 0);
-
-        model.drawEx(
-            if (positionMode) position.scale(10) else .{ .x = 0, .y = 0, .z = 0 }, 
-            .{ .x = 1, .y = 0, .z = 0 }, 
-            0, 
-            .{ .x = 1, .y = 1, .z = 1 }, 
-            rl.Color.white);
-        for (anim.framePoses[0], 0..@intCast(anim.boneCount)) |transform, _| {
-            rl.drawSphere(transform.translation, 0.1, rl.Color.red);
-        }
-
-        camera.end();
-        rl.endTextureMode();
-        const sourceRect = rl.Rectangle{
-            .x = 0,
-            .y = 0,
-            .width = width * factor,
-            .height = -height * factor,
-        };
-        const destRect = rl.Rectangle{
-            .x = 0,
-            .y = 0,
-            .width = width,
-            .height = height,
-        };
-        rl.drawTexturePro(renderTarget.texture, sourceRect, destRect, .{ .x = 0, .y = 0 }, 0, rl.Color.white);
+                    model.drawEx(
+                        if (positionMode) position.scale(10) else .{ .x = 0, .y = 0, .z = 0 }, 
+                        .{ .x = 1, .y = 0, .z = 0 }, 
+                        0, 
+                        .{ .x = 1, .y = 1, .z = 1 }, 
+                        rl.Color.white);
+                    // for (anim.framePoses[0], 0..@intCast(anim.boneCount)) |transform, _| {
+                    //     rl.drawSphere(transform.translation, 0.1, rl.Color.red);
+                    // }
+                rl.endMode3D();
+            rl.endTextureMode();
+            const sourceRect = rl.Rectangle{
+                .x = 0,
+                .y = 0,
+                .width = width * targetResFactor,
+                .height = -height * targetResFactor,
+            };
+            const destRect = rl.Rectangle{
+                .x = 0,
+                .y = 0,
+                .width = width,
+                .height = height,
+            };
+            const factor = (depth / defaultCamera.position.z) * 0.4;
+            const resolution: rl.Vector2 = .{ .x = width * factor, .y = height * factor };
+            rl.setShaderValue(downscaleShader, dsResolutionLoc, &resolution, .shader_uniform_vec2);
+            rl.beginShaderMode(downscaleShader);
+                rl.drawTexturePro(renderTarget.texture, sourceRect, destRect, .{ .x = 0, .y = 0 }, 0, rl.Color.white);
+            rl.endShaderMode();
         rl.endDrawing();
     }
 }
@@ -449,7 +460,7 @@ fn snapBonesToParent(pose: []rl.Transform, bones: []const rl.BoneInfo, bindPose:
         rotOpposite.z *= -1;
         const offsetRotated = offset.rotateByQuaternion(rotOpposite).rotateByQuaternion(parent.rotation);
         bone.translation = parent.translation.add(offsetRotated);
-        rl.drawLine3D(parent.translation, bone.translation, rl.Color.magenta);
+        // rl.drawLine3D(parent.translation, bone.translation, rl.Color.magenta);
     }
 }
 
