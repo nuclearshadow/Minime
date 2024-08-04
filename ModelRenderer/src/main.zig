@@ -96,6 +96,13 @@ fn getBone(bones: anytype, index: BoneIndex) *(@typeInfo(@TypeOf(bones)).Pointer
     return &bones[@intFromEnum(index)];
 }
 
+const PositionMode = enum {
+    locked,
+    xy,
+    xyz,
+    count,
+};
+
 const xAxis = rl.Vector3{ .x = 1, .y = 0, .z = 0 };
 const yAxis = rl.Vector3{ .x = 0, .y = 1, .z = 0 };
 const zAxis = rl.Vector3{ .x = 0, .y = 0, .z = 1 };
@@ -146,7 +153,7 @@ pub fn main() !void {
 
     const light = rlights.Light.create(.light_directional, rl.Vector3{ .x = 0, .y = 5, .z = 15 }, rl.Vector3.zero(), rl.Color.white, lightingShader);
 
-    const modelPath = "resources/3d_models/avatar_rigged.glb";
+    const modelPath = "resources/3d_models/avatar_rigged_opt.glb";
 
     var model = rl.loadModel(modelPath);
     defer model.unload();
@@ -164,7 +171,7 @@ pub fn main() !void {
 
     var calculatedRotations: [@intFromEnum(BoneIndex.count)]rl.Quaternion = undefined;
 
-    var positionMode = true;
+    var positionMode: PositionMode = .locked;
 
     var inputBuffer: [1024 * 6]u8 = undefined;
     var stdin = std.io.getStdIn();
@@ -207,8 +214,10 @@ pub fn main() !void {
         camMove.x = rl.getMouseWheelMove() * camSpeed * dt;
         rl.updateCameraPro(&camera, camMove, rl.Vector3.zero(), 0);
 
-        if (rl.isKeyPressed(.key_p)) positionMode = !positionMode;
-        if (rl.isKeyPressed(.key_r) or positionMode) camera = defaultCamera; // reset the camera
+        if (rl.isKeyPressed(.key_p)) {
+            positionMode = @enumFromInt((@intFromEnum(positionMode) + 1) % @intFromEnum(PositionMode.count));
+        }
+        if (rl.isKeyPressed(.key_r)) camera = defaultCamera;
 
         rl.beginDrawing();
             rl.beginTextureMode(renderTarget);
@@ -223,8 +232,10 @@ pub fn main() !void {
                     snapBonesToParent(pose, bones, bindPose);
                     rl.updateModelAnimation(model, anim, 0);
 
+                    if (positionMode == .xy) position.z = 0;
+                    if (positionMode == .locked) position = rl.Vector3.zero();
                     model.drawEx(
-                        if (positionMode) position.scale(10) else .{ .x = 0, .y = 0, .z = 0 }, 
+                        position.scale(10), 
                         .{ .x = 1, .y = 0, .z = 0 }, 
                         0, 
                         .{ .x = 1, .y = 1, .z = 1 }, 
@@ -304,7 +315,7 @@ fn rotationsFromLandmarks(rotations: []rl.Quaternion, landmarks: []const Landmar
             landmarkToVector3(getLandmark(landmarks, .right_ear)),
             0.5,
         );
-        const up = eyesMid.lerp(earsMid, 0.3).subtract(mouthMid).normalize();
+        const up = eyesMid.lerp(earsMid, 0.2).subtract(mouthMid).normalize();
         const left = mouthLeft.subtract(mouthRight).normalize();
         const forward = left.crossProduct(up).normalize();
 
